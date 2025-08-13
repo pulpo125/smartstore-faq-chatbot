@@ -181,7 +181,7 @@ cython_debug/
 service.yaml
 
 # Data
-data/
+/data/
 
 # Cache files
 .DS_Store
@@ -189,3 +189,6 @@ llm_cache.db
 
 # Custom
 playground/
+
+# Chroma DB
+/chroma_db/
