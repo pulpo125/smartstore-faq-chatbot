@@ -1,0 +1,8 @@
+data:
+  path: ./data/final_result.pkl
+
+chroma_db:
+  path: ./chroma_db
+  collection_name: smartstore_faq
+  max_chunk_size: 1000
+  batch_size: 100
