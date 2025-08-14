@@ -170,7 +170,9 @@ def get_or_create_collection(db_client: Any, collection_name: str) -> Any:
     if is_collection:
         # 컬렉션이 이미 존재하는 경우
         logger.info(f"{collection_name}이 존재합니다.")
-        collection = db_client.get_collection(name=collection_name)
+        collection = db_client.get_collection(
+            name=collection_name, embedding_function=get_openai_embedding_func()
+        )
     else:
         # 컬렉션이 존재하지 않는 경우
         logger.info(
