@@ -1,4 +1,4 @@
-# rag 기본 함수
+# 도구 관련 함수 모음입니다.
 from typing import Any
 from src.config import cfg_engine
 from src.utils import logger
@@ -15,12 +15,7 @@ def retrieve(query: str, collection: Any) -> list:
         collection: ChromaDB 컬렉션 객체
 
     Returns:
-        검색 결과(메타데이터) 리스트 목록
-        - chunk_id
-        - parent_id
-        - question
-        - query
-        - document
+        contexts: 검색 결과 컨텍스트 리스트
     """
     # 검색
     try:
@@ -31,11 +26,15 @@ def retrieve(query: str, collection: Any) -> list:
         )
         metadatas = docs["metadatas"][0]
         logger.info(f"[retrieve] 검색 결과 {len(metadatas)}개의 문서가 있습니다.")
+
     except Exception as e:
         logger.error(f"[retrieve] 검색 실패: {e}")
-        metadatas = []
+        contexts = []
 
-    return metadatas
+    # 컨텍스트 추출
+    contexts = get_contexts(metadatas)
+
+    return contexts
 
 
 def get_contexts(metadatas: list) -> list:

@@ -1,6 +1,7 @@
 import logging
 import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+from openai import OpenAI, AsyncOpenAI
 
 from src.config import cfg, cfg_engine
 
@@ -39,6 +40,22 @@ def get_chroma_db_client():
     key = "chroma_db"
     if not hasattr(client_manager, key):
         client = chromadb.PersistentClient(path=cfg_engine.chroma_db.path)
+        setattr(client_manager, key, client)
+    return getattr(client_manager, key)
+
+
+def get_openai_client():
+    key = "openai"
+    if not hasattr(client_manager, key):
+        client = OpenAI(api_key=cfg.openai.api_key)
+        setattr(client_manager, key, client)
+    return getattr(client_manager, key)
+
+
+def get_async_openai_client():
+    key = "async_openai"
+    if not hasattr(client_manager, key):
+        client = AsyncOpenAI(api_key=cfg.openai.api_key)
         setattr(client_manager, key, client)
     return getattr(client_manager, key)
 
