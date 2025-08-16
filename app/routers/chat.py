@@ -2,20 +2,20 @@ import traceback
 import json
 from typing import Generator
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse as FastAPIStreamingResponse
 
 from src.agents.faq_agent import FAQAgent
 from src.utils import logger
 
 from app import llm, db
-from app.models import ChatRequest
+from app.models import ChatRequest, StreamingResponse as PydanticStreamingResponse
 
 # ==================================================
 router = APIRouter()
 # ==================================================
 
 
-@router.post("/v1")
+@router.post("/v1", response_model=PydanticStreamingResponse)
 async def chat_stream(params: ChatRequest):
     """FAQ 채팅 스트리밍 엔드포인트"""
 
@@ -31,7 +31,7 @@ async def chat_stream(params: ChatRequest):
         agent.initialize(session_id, chat_id)
 
         # 스트리밍 응답 반환
-        return StreamingResponse(
+        return FastAPIStreamingResponse(
             stream_response(agent, params.input),
             media_type="application/json",  # JSON 스트리밍으로 변경
             headers={
