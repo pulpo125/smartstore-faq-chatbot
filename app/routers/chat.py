@@ -27,8 +27,6 @@ async def chat_stream(params: ChatRequest):
         # 에이전트
         agent = FAQAgent(llm=llm, db=db)
         agent.initialize(session_id, chat_id)
-        agent.delete_state()
-        agent.initialize(session_id, chat_id)
 
         # 스트리밍 응답 반환
         return FastAPIStreamingResponse(
