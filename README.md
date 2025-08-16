@@ -88,7 +88,7 @@ FastAPI 실행 후 아래 URL에 접속하세요.
 {
   "chat_id": "test1",
   "input": "빠른 정산은 어떻게 신청해?",
-  "session_id": "asdasdsad"
+  "session_id": "test1"
 }
 ```
 
