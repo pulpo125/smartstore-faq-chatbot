@@ -7,3 +7,9 @@ chroma_db:
   max_chunk_size: 1000
   batch_size: 100
   n_results: 10
+
+chat_message_history:
+  collection_name: chat_history
+
+faq_agent:
+  last_n_turn: 5 # history 적용 turn 수

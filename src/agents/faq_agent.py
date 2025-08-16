@@ -1,26 +1,61 @@
 # FAQAgent 는 네이버 스마트스토어 FAQ 에 대해 답변하는 챗봇 입니다.
 
-from typing import Any
+from typing import Any, List, Dict
 from pydantic import BaseModel, Field
 import json
 
-from src.utils import logger
-from src.config import cfg
+from src.utils import logger, get_chroma_db_client
+from src.config import cfg, cfg_engine
 from src.agents.prompts import AGENT_SYSTEM_PROMPT, ERROR_RESULT_PROMPT
 from src.agents.tools import retrieve
+from src.db.chat_message_history import ChatMessageHistory
+from src.decorator import timer
 
 
 class FAQAgent(BaseModel):
     # clinent
     llm: Any = Field(..., description="OpneAI Client")
-    db: Any = Field(..., description="ChromaDB collection")
+    db: Any = Field(..., description="ChromaDB Client collection for RAG")
+    chat_message_history: ChatMessageHistory = Field(
+        None, description="Chat message history Manager"
+    )
 
-    # Agent attributes
+    # Agent States
     available_functions: dict = Field(None, description="이용가능한 도구 함수 목록")
 
     class Config:
         arbitrary_types_allowed = True
 
+    def initialize(self, session_id: str, chat_id: str) -> None:
+        db_client = get_chroma_db_client()
+        self.chat_message_history = ChatMessageHistory(
+            session_id,
+            chat_id,
+            db_client,
+            cfg_engine.chat_message_history.collection_name,
+        )
+
+    def delete_state(self) -> None:
+        """모든 Agent 상태를 삭제합니다."""
+        self.available_functions = None
+        self.chat_message_history.clear()
+        self.chat_message_history = None
+
+    def _select_history(self) -> List[Dict[str, str]]:
+        """last_n_turn 만큼 히스토리를 선택합니다."""
+        history_messages = self.chat_message_history.messages()
+        last_n_turn = cfg_engine.faq_agent.last_n_turn
+        return history_messages[-last_n_turn:]
+
+    def _update_history(self, input: str, result: str) -> None:
+        "chat history 를 업데이트 합니다."
+        update_history = [
+            {"role": "user", "content": input},
+            {"role": "assistant", "content": result},
+        ]
+        self.chat_message_history.add_messages(update_history)
+
+    @timer
     def invoke(self, input: str) -> str:
         """
         Agent Invoke 함수 입니다.
@@ -28,13 +63,18 @@ class FAQAgent(BaseModel):
         예외 발생 시 에러 메시지를 반환 합니다.
         """
         logger.info(f"[Agent] Invoking...")
+        logger.info(f"[Agent] User: {input}")
+
         try:
+            # chat history 로드
+            history_messages = self._select_history()
+
             # Create Prompt
             messages = [
                 {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-                {"role": "user", "content": input},
             ]
-            logger.info(f"[Agent] Human: {input}")
+            messages.extend(history_messages)
+            messages.append({"role": "user", "content": input})
 
             # Create tool
             tools = self.get_tools()
@@ -58,7 +98,8 @@ class FAQAgent(BaseModel):
                         function_name = tool_call.function.name
                         if function_name not in self.available_functions:
                             logger.error(
-                                f"[Agent] Undefined tool call: {function_name}"
+                                f"[Agent] Undefined tool call: {function_name}",
+                                exc_info=True,
                             )
                             raise ValueError(
                                 f"정의되지 않은 함수 호출: {function_name}"
@@ -78,7 +119,8 @@ class FAQAgent(BaseModel):
                             )
                         except Exception as e:
                             logger.error(
-                                f"[Tool] Error executing '{function_name}': {e}"
+                                f"[Tool] Error executing '{function_name}': {e}",
+                                exc_info=True,
                             )
                             raise e
 
@@ -99,11 +141,14 @@ class FAQAgent(BaseModel):
                 # Tool 이 호출되지 않은 경우
                 else:
                     result = response_message.content
-                    logger.info(f"[Agent] AI: {result}")
+                    logger.info(f"[Agent] Assistant:\n{result}")
+
+                    # 히스토리 저장
+                    self._update_history(input, result)
                     return result
 
         except Exception as e:
-            logger.error(f"[Agent] Exception occurred: {e}")
+            logger.error(f"[Agent] Exception occurred: {e}", exc_info=True)
             result = ERROR_RESULT_PROMPT
             return result
 
