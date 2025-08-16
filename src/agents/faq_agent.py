@@ -6,7 +6,11 @@ import json
 
 from src.utils import logger, get_chroma_db_client
 from src.config import cfg, cfg_engine
-from src.agents.prompts import AGENT_SYSTEM_PROMPT, ERROR_RESULT_PROMPT
+from src.agents.prompts import (
+    AGENT_SYSTEM_PROMPT,
+    ERROR_RESULT_PROMPT,
+    NEXT_QUESTION_PROMPT,
+)
 from src.agents.tools import retrieve
 from src.db.chat_message_history import ChatMessageHistory
 from src.decorator import timer
@@ -301,3 +305,66 @@ class FAQAgent(BaseModel):
     def retrieve_faq(self, query: str) -> list:
         """FAQ 문서를 검색하는 도구 입니다."""
         return retrieve(query, self.db)
+
+    @timer
+    def generate_next_question(self) -> List[str]:
+        """
+        직전 대화(User, Assistant)를 기반으로 후속 질문 2개를 생성합니다.
+        """
+        logger.info("[Next Question] Generating...")
+        try:
+            # 최근 히스토리에서 마지막 user/assistant 메시지 추출
+            history_messages = self._select_history()
+            if not history_messages or len(history_messages) < 2:
+                logger.warning(
+                    "[Next Question] 히스토리가 부족하여 후속 질문을 생성할 수 없습니다."
+                )
+                return []
+
+            # 마지막 User / Assistant 메시지 찾기
+            user_message = ""
+            assistant_message = ""
+            for msg in reversed(history_messages):
+                if msg["role"] == "assistant" and not assistant_message:
+                    assistant_message = msg["content"]
+                elif msg["role"] == "user" and not user_message:
+                    user_message = msg["content"]
+                if user_message and assistant_message:
+                    break
+
+            if not user_message or not assistant_message:
+                logger.warning(
+                    "[Next Question] User/Assistant 메시지를 찾을 수 없어 후속 질문을 생성하지 않습니다."
+                )
+                return []
+
+            # Prompt 채우기
+            prompt = NEXT_QUESTION_PROMPT.format(
+                user_message=user_message,
+                assistant_message=assistant_message,
+            )
+
+            messages = [{"role": "system", "content": prompt}]
+
+            # 호출 (스트리밍 대신 단일 호출)
+            response = self.create_chat_completion(
+                messages=messages, stream=False, tools=[]
+            )
+            result_text = response.choices[0].message.content.strip()
+            logger.info(f"[Next Question] raw result:\n{result_text}")
+
+            # 문자열을 리스트로 파싱
+            try:
+                next_questions = json.loads(result_text)
+                if isinstance(next_questions, list):
+                    return next_questions
+                else:
+                    logger.error("[Agent] 결과가 리스트 형식이 아닙니다.")
+                    return []
+            except Exception as e:
+                logger.error(f"[Agent] 후속 질문 파싱 실패: {e}")
+                return []
+
+        except Exception as e:
+            logger.error(f"[Agent] generate_next_question 실패: {e}", exc_info=True)
+            return []
