@@ -11,7 +11,7 @@ def load_data(filepath: str) -> dict:
             data = pickle.load(file)
         return data
     except Exception as e:
-        logger.error(f"데이터 로드 실패: {e}")
+        logger.error(f"데이터 로드 실패: {e}", exc_info=True)
 
 
 def preprocess_data(data: dict) -> dict:

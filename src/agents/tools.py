@@ -25,10 +25,10 @@ def retrieve(query: str, collection: Any) -> list:
             include=["metadatas"],
         )
         metadatas = docs["metadatas"][0]
-        logger.info(f"[retrieve] 검색 결과 {len(metadatas)}개의 문서가 있습니다.")
+        logger.info(f"[RetrieveFAQ] Retrieved {len(metadatas)} documents")
 
     except Exception as e:
-        logger.error(f"[retrieve] 검색 실패: {e}")
+        logger.error(f"[RetrieveFAQ] Retrieve Failed: {e}", exc_info=True)
         contexts = []
 
     # 컨텍스트 추출

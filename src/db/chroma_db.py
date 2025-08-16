@@ -58,7 +58,7 @@ def insert_data(filepath: str, collection: Any) -> None:
                 )
 
         except Exception as e:
-            logger.error(f"[insert_data] 데이터 삽입 중 에러 발생: {e}")
+            logger.error(f"[insert_data] 데이터 삽입 중 에러 발생: {e}", exc_info=True)
             continue
 
     logger.info("Finished insert_data")
@@ -135,7 +135,9 @@ def insert_data_batch(filepath: str, collection: Any, batch_size: int = 100) -> 
                     batch_documents = []
 
         except Exception as e:
-            logger.error(f"[insert_data_batch] 데이터 삽입 중 에러 발생: {e}")
+            logger.error(
+                f"[insert_data_batch] 데이터 삽입 중 에러 발생: {e}", exc_info=True
+            )
             continue
 
     # 전체 루프 종료 후 남은 청크 삽입
@@ -169,14 +171,14 @@ def get_or_create_collection(db_client: Any, collection_name: str) -> Any:
 
     if is_collection:
         # 컬렉션이 이미 존재하는 경우
-        logger.info(f"{collection_name}이 존재합니다.")
+        logger.info(f"[ChromaDB] '{collection_name}' exists. Connect Collection")
         collection = db_client.get_collection(
             name=collection_name, embedding_function=get_openai_embedding_func()
         )
     else:
         # 컬렉션이 존재하지 않는 경우
         logger.info(
-            f"{collection_name}이 존재하지 않습니다. 새로 컬렉션을 생성하고 데이터를 삽입합니다."
+            f"[ChromaDB] '{collection_name}' does not exist. Create the collection and insert the data."
         )
         collection = db_client.create_collection(
             name=collection_name, embedding_function=get_openai_embedding_func()
