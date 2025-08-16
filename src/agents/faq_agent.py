@@ -11,7 +11,7 @@ from src.agents.prompts import (
     ERROR_RESULT_PROMPT,
     NEXT_QUESTION_PROMPT,
 )
-from src.agents.tools import retrieve
+from src.agents.tools import retrieve_advanced
 from src.db.chat_message_history import ChatMessageHistory
 from src.decorator import timer
 
@@ -164,6 +164,9 @@ class FAQAgent(BaseModel):
         사용자 입력에 대해 스트리밍 응답을 생성합니다.
         예외 발생 시 에러 메시지를 반환 합니다.
         """
+        logger.info(f"[Agent] Streaming...")
+        logger.info(f"[Agent] User: {input}")
+
         try:
             # 초기 설정
             history_messages = self._select_history()
@@ -284,13 +287,13 @@ class FAQAgent(BaseModel):
                 "type": "function",
                 "function": {
                     "name": "retrieve_faq",
-                    "description": "사용자 쿼리와 유사한 FAQ 문서를 검색하는 도구 입니다.",
+                    "description": "스마트스토어 FAQ 데이터베이스에서 관련 문서를 검색하는 도구입니다.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "query": {
                                 "type": "string",
-                                "description": "사용자 쿼리입니다.",
+                                "description": "대화 히스토리를 참고해 의미가 잘 드러나는 짧고 자연스러운 하나의 문장형태로 재작성",
                             }
                         },
                         "required": ["query"],
@@ -304,7 +307,7 @@ class FAQAgent(BaseModel):
 
     def retrieve_faq(self, query: str) -> list:
         """FAQ 문서를 검색하는 도구 입니다."""
-        return retrieve(query, self.db)
+        return retrieve_advanced(query, self.db, self.llm)
 
     @timer
     def generate_next_question(self) -> List[str]:
