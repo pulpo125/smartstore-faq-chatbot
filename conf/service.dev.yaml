@@ -3,4 +3,4 @@ openai:
   embeddings_model: text-embedding-3-small
   embeddings_dimensions: 512
   llm_model: gpt-5-mini
-  llm_max_tokens: 1024
+  llm_max_tokens: 2048
