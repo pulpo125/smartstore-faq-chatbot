@@ -44,8 +44,6 @@ llm = get_openai_client()
 
 # DB client
 db_client = get_chroma_db_client()
-
-# 데이터가 있는 경우 컬렉션 연결, 없는 경우 데이터 삽입 후 연결
 db = get_or_create_collection(
     db_client=db_client, collection_name=cfg_engine.chroma_db.collection_name
 )
@@ -54,11 +52,12 @@ db = get_or_create_collection(
 #  Router
 #  ===============================================================
 
-from app.routers import healthcheck, chat
+from app.routers import healthcheck, chat, db
 
 router_infos = [
     (healthcheck.router, "healthcheck"),
     (chat.router, "chat"),
+    (db.router, "db"),
 ]
 
 for router_info in router_infos:

@@ -3,6 +3,11 @@ from typing import Optional, List, Literal, Union
 from enum import Enum
 
 
+# =====================
+# chat
+# =====================
+
+
 class ChatRequest(BaseModel):
     input: str = Field(..., description="사용자 입력값")
     session_id: str = Field(..., description="세션 id")
@@ -16,13 +21,6 @@ class ChatRequest(BaseModel):
                 "input": "string",
             }
         }
-
-
-class PostResult(BaseModel):
-    success: bool
-
-    class Config:
-        json_schema_extra = {"example": {"success": True}}
 
 
 class StreamingType(str, Enum):
@@ -90,3 +88,34 @@ class ErrorResponse(BaseModel):
 StreamingResponse = Union[
     ChatResponse, ChatEndResponse, CompleteResponse, ErrorResponse
 ]
+
+
+# =====================
+# db
+# =====================
+
+
+class InsertBatchRequest(BaseModel):
+    """배치 단위로 ChromaDB에 데이터를 삽입하기 위한 요청 모델"""
+
+    filepath: Optional[str] = Field(
+        None, description="삽입할 데이터 파일 경로, 지정하지 않으면 기본 경로 사용"
+    )
+    batch_size: Optional[int] = Field(
+        None, description="한 번에 삽입할 데이터 개수, 지정하지 않으면 기본값 사용"
+    )
+
+    class Config:
+        schema_extra = {"example": {"filepath": None, "batch_size": None}}
+
+
+class InsertResponse(BaseModel):
+    """DB API 성공/실패 응답 모델"""
+
+    status: str = Field(..., description="응답 상태")
+    message: str = Field(..., description="상세 메시지")
+
+    class Config:
+        schema_extra = {
+            "example": {"status": "success", "message": "데이터가 삽입되었습니다."}
+        }

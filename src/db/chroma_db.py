@@ -32,7 +32,7 @@ def insert_data(filepath: str, collection: Any) -> None:
     processed_data = preprocess_data(data)
 
     # 청킹 및 데이터 삽입
-    for q, a in tqdm(list(processed_data.items())[:3]):
+    for q, a in tqdm(list(processed_data.items())):
         try:
             parent_id = str(uuid.uuid4())
             chunks = chunk_text(
@@ -98,7 +98,7 @@ def insert_data_batch(filepath: str, collection: Any, batch_size: int = 100) -> 
 
     total_chunks = 0
 
-    for q, a in list(processed_data.items())[:101]:
+    for q, a in list(processed_data.items()):
         try:
             parent_id = str(uuid.uuid4())
             chunks = chunk_text(
@@ -182,17 +182,6 @@ def get_or_create_collection(db_client: Any, collection_name: str) -> Any:
         )
         collection = db_client.create_collection(
             name=collection_name, embedding_function=get_openai_embedding_func()
-        )
-
-        # 데이터 삽입
-        # insert_data(
-        #     filepath=cfg_engine.data.path,
-        #     collection=collection,
-        # )
-        insert_data_batch(
-            filepath=cfg_engine.data.path,
-            collection=collection,
-            batch_size=cfg_engine.chroma_db.batch_size,
         )
 
     return collection
