@@ -1,6 +1,6 @@
 # FAQAgent 는 네이버 스마트스토어 FAQ 에 대해 답변하는 챗봇 입니다.
 
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Generator
 from pydantic import BaseModel, Field
 import json
 
@@ -114,9 +114,10 @@ class FAQAgent(BaseModel):
                             function_response = self.available_functions[function_name](
                                 **function_args
                             )
-                            logger.info(
-                                f"[Tool] {function_name} returned:\n{function_response}"
-                            )
+                            if cfg_engine.faq_agent.verbose:
+                                logger.info(
+                                    f"[Tool] {function_name} returned:\n{function_response}"
+                                )
                         except Exception as e:
                             logger.error(
                                 f"[Tool] Error executing '{function_name}': {e}",
@@ -152,14 +153,95 @@ class FAQAgent(BaseModel):
             result = ERROR_RESULT_PROMPT
             return result
 
-    def ainvoke(self, input: str):
-        pass
+    @timer
+    def stream(self, input: str) -> Generator[str, None, None]:
+        """
+        Agent Stream 함수 입니다.
+        사용자 입력에 대해 스트리밍 응답을 생성합니다.
+        예외 발생 시 에러 메시지를 반환 합니다.
+        """
+        try:
+            # 초기 설정
+            history_messages = self._select_history()
+            messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+            messages.extend(history_messages)
+            messages.append({"role": "user", "content": input})
+            tools = self.get_tools()
 
-    def stream(self, input: str):
-        pass
+            full_response = ""
 
-    def astream(self, input: str):
-        pass
+            # 1단계: Tool call 필요성만 한 번 확인
+            logger.info(f"[Agent] Calling LLM...")
+            response = self.create_chat_completion(messages, stream=False, tools=tools)
+            response_message = response.choices[0].message
+            tool_calls = response_message.tool_calls
+
+            # 2단계: Tool이 있으면 실행
+            if tool_calls:
+                messages.append(response_message)
+
+                for tool_call in tool_calls:
+                    # Tool 검증
+                    function_name = tool_call.function.name
+                    if function_name not in self.available_functions:
+                        logger.error(
+                            f"[Agent] Undefined tool call: {function_name}",
+                            exc_info=True,
+                        )
+                        raise ValueError(f"정의되지 않은 함수 호출: {function_name}")
+                    function_args = json.loads(tool_call.function.arguments)
+
+                    # Tool 실행
+                    logger.info(
+                        f"[Agent] Action: Call tool '{function_name}' with args {function_args}"
+                    )
+                    try:
+                        function_response = self.available_functions[function_name](
+                            **function_args
+                        )
+                        if cfg_engine.faq_agent.verbose:
+                            logger.info(
+                                f"[Tool] {function_name} returned:\n{function_response}"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            f"[Tool] Error executing '{function_name}': {e}",
+                            exc_info=True,
+                        )
+                        raise e
+
+                    # Tool 실행 결과 추가
+                    messages.append(
+                        {
+                            "tool_call_id": tool_call.id,
+                            "role": "tool",
+                            "name": function_name,
+                            "content": json.dumps(
+                                function_response, ensure_ascii=False
+                            ),
+                        }
+                    )
+
+            # 3단계: 최종 응답을 스트리밍으로 생성 (tool 없이)
+            logger.info(f"[Agent] Streaming response...")
+            stream_response = self.create_chat_completion(
+                messages, stream=True, tools=[]
+            )
+
+            for chunk in stream_response:
+                if chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    yield content
+
+            logger.info(f"[Agent] Assistant:\n{full_response}")
+
+            # 히스토리 저장
+            self._update_history(input, full_response)
+
+        except Exception as e:
+            logger.error(f"[Agent] Exception occurred: {e}", exc_info=True)
+            yield ERROR_RESULT_PROMPT
 
     def create_chat_completion(
         self,
